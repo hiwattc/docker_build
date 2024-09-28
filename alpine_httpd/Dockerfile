@@ -11,6 +11,8 @@ ENV OPENSSSL_VERSION=openssl-3.3.1 \
     PCRE_VERSION=pcre2-10.44 \
     HTTPD_VERSION=httpd-2.4.62 \
     JK_VERSION=tomcat-connectors-1.2.49-src \
+    NGHTTP2_VERSION=v1.48.0 \
+    NGHTTP2_NM=nghttp2-1.48.0 \
     INSTALL_PATH=/http/httpd \
     SRC_PATH=/usr/local/src \
     TEMP_DIR=/tmp/install/httpd \
@@ -28,7 +30,8 @@ RUN wget https://www.openssl.org/source/${OPENSSSL_VERSION}.tar.gz && \
     wget https://dlcdn.apache.org/apr/${APR_UTIL_VERSION}.tar.gz && \
     wget https://github.com/PCRE2Project/pcre2/releases/download/pcre2-10.44/${PCRE_VERSION}.tar.gz && \
     wget https://dlcdn.apache.org/httpd/${HTTPD_VERSION}.tar.gz && \
-    wget https://downloads.apache.org/tomcat/tomcat-connectors/jk/${JK_VERSION}.tar.gz
+    wget https://downloads.apache.org/tomcat/tomcat-connectors/jk/${JK_VERSION}.tar.gz && \
+    wget https://github.com/nghttp2/nghttp2/archive/refs/tags/${NGHTTP2_VERSION}.tar.gz
 
 # Extract the downloaded files
 RUN tar xvfz ${OPENSSSL_VERSION}.tar.gz && \
@@ -37,7 +40,8 @@ RUN tar xvfz ${OPENSSSL_VERSION}.tar.gz && \
     tar xvfz ${PCRE_VERSION}.tar.gz && \
     tar xvfz ${HTTPD_VERSION}.tar.gz && \
     tar xvfz ${JK_VERSION}.tar.gz && \
-    mv ${OPENSSSL_VERSION} ${APR_VERSION} ${APR_UTIL_VERSION} ${PCRE_VERSION} ${HTTPD_VERSION} ${JK_VERSION} ${SRC_PATH}/
+    tar xvfz ${NGHTTP2_VERSION}.tar.gz && \
+    mv ${OPENSSSL_VERSION} ${APR_VERSION} ${APR_UTIL_VERSION} ${PCRE_VERSION} ${HTTPD_VERSION} ${JK_VERSION} ${NGHTTP2_NM} ${SRC_PATH}/
 
 # Install OpenSSL
 #RUN cd ${SRC_PATH}/${OPENSSSL_VERSION} && \
@@ -64,6 +68,14 @@ RUN cd ${SRC_PATH}/${APR_UTIL_VERSION} && \
 RUN cd ${SRC_PATH}/${PCRE_VERSION} && \
     ./configure --prefix=${SRC_PATH}/${PCRE_VERSION} --with-apr-util=${SRC_PATH}/${APR_UTIL_VERSION} --with-apr=${SRC_PATH}/${APR_VERSION} && make && make install
 
+
+RUN apk add --no-cache cmake
+# Download and install nghttp2
+RUN cd ${SRC_PATH}/${NGHTTP2_NM} && \
+    #./configure && make && make install && \
+    cmake . && make && make install && \
+    cd .. && rm -rf ${NGHTTP2_NM}
+
 # Install HTTPD
 RUN cd ${SRC_PATH}/${HTTPD_VERSION} && \
     export PATH=${SRC_PATH}/${PCRE_VERSION}/bin:$PATH && \
@@ -75,7 +87,8 @@ RUN cd ${SRC_PATH}/${HTTPD_VERSION} && \
                 --with-apr-util=${SRC_PATH}/${APR_UTIL_VERSION} \
                 --with-pcre=${SRC_PATH}/${PCRE_VERSION} \
                 --with-ssl=${OPENSSL_PATH} \
-                --with-mpm=event && \
+                --with-mpm=event \
+                --enable-http2 && \
     make && make install && \
     cd .. && rm -rf ${SRC_PATH}/${HTTPD_VERSION}
 
